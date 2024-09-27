@@ -31,7 +31,7 @@ class KoSpider(scrapy.Spider):
                         PageMethod("fill", "#txt_1_value1", f"{q}-"),
                         PageMethod("click", "#btnSearch"),
                         PageMethod("wait_for_selector", "#lblPageCount"),
-                    ]
+                    ],
                 },
             )
 
@@ -55,13 +55,13 @@ class KoSpider(scrapy.Spider):
                     for i, result in enumerate(results):
                         self.logger.info(f"results {i}")
                         if await result.query_selector('b:has-text("Journal")'):
-                            issn_span = await result.query_selector(
-                                'li span:has-text("ISSN")'
-                            )
-                            issn_text = await issn_span.inner_text()
-                            issn = issn_text.split("：")[-1].strip()
                             a = await result.query_selector("h1 a")
                             link = await a.get_attribute("href")
+                            # issn_span = await result.query_selector(
+                            #     'li span:has-text("ISSN")'
+                            # )
+                            # issn_text = await issn_span.inner_text()
+                            # issn = issn_text.split("：")[-1].strip()
                             # print(issn, a, link)
                             yield scrapy.Request(
                                 url=response.urljoin(link),

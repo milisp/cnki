@@ -8,9 +8,6 @@ from pathlib import Path
 
 import pandas as pd
 
-# useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
-
 from .items import DetailItem, XztgItem
 
 
