@@ -1,5 +1,9 @@
 import argparse
-import subprocess
+
+from scrapy.crawler import CrawlerProcess
+from scrapy.utils.project import get_project_settings
+
+from cnki.spiders.ko import KoSpider
 
 
 def parse_args():
@@ -15,28 +19,14 @@ def parse_args():
     return args
 
 
-def run_spider(sf, headless, logfile):
-    # 构建命令
-    command = [
-        "scrapy",
-        "crawl",
-        "ko",
-        "-a",
-        f"sf={sf}",
-        "-s",
-        f"headless={headless}",
-    ]
-    if logfile:
-        command += ["--logfile", f"{logfile}"]
-    print(command)
-
-    # 运行命令
-    subprocess.run(command)
-
+settings = get_project_settings()
 
 if __name__ == "__main__":
-    # 获取命令行参数
     args = parse_args()
+    settings["SF"] = args.sf
+    settings["PLAYWRIGHT_LAUNCH_OPTIONS"] = {"headless": args.headless}
+    settings["LOG_FILE"] = args.logfile
 
-    headless = "True" if args.headless else ""
-    run_spider(args.sf, args.headless, args.logfile)
+    process = CrawlerProcess(settings)
+    process.crawl(KoSpider)
+    process.start()

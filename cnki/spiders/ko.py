@@ -10,14 +10,10 @@ class KoSpider(scrapy.Spider):
     allowed_domains = ["cnki.net"]
     headers = None
 
-    def __init__(self, sf: str = "31", headless="True", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sf = sf  # 搜索参数
-
     def start_requests(self):
         user_agent = self.settings.get("USER_AGENT")
         self.headers = {"user-agent": user_agent}
-        for q in self.sf.split(","):
+        for q in self.settings.get("SF").split(","):
             yield scrapy.Request(
                 url="https://navi.cnki.net/knavi/",  # 列表页的 URL
                 callback=self.parse,
@@ -47,22 +43,16 @@ class KoSpider(scrapy.Spider):
         for page_num in range(start_page, total + 1):
             # 更新最后页数
             update_progress(q, page_num)
-            print(f"page {page_num}")
+            self.logger.info(f"page {page_num}")
             # retry
             for _ in range(3):
                 try:
                     results = await page.query_selector_all("dl.result")
                     for i, result in enumerate(results):
-                        self.logger.info(f"results {i}")
+                        self.logger.info(f"results item {i}")
                         if await result.query_selector('b:has-text("Journal")'):
                             a = await result.query_selector("h1 a")
                             link = await a.get_attribute("href")
-                            # issn_span = await result.query_selector(
-                            #     'li span:has-text("ISSN")'
-                            # )
-                            # issn_text = await issn_span.inner_text()
-                            # issn = issn_text.split("：")[-1].strip()
-                            # print(issn, a, link)
                             yield scrapy.Request(
                                 url=response.urljoin(link),
                                 callback=self.parse_detail,
@@ -70,6 +60,7 @@ class KoSpider(scrapy.Spider):
                     break
                 except Exception as e:
                     print(f"error {e}")
+                    self.logger.error(e)
 
             next_button = await page.query_selector("a.next")
             if next_button:
@@ -118,7 +109,7 @@ class KoSpider(scrapy.Spider):
         item["timeLag"] = data["timeLag"]
         baseId = response.meta["baseId"]
         url = f"https://xztg.cnki.net/csjs-sj/JournalBaseInfo/getSubmissionInfo?baseId={baseId}"
-        print("parse tg ok")
+        # print("parse tg ok")
         yield scrapy.Request(
             url,
             callback=self.parse_sub_mission_info,
@@ -139,7 +130,7 @@ class KoSpider(scrapy.Spider):
             "editorInChief",
             "hostUnit",
         ]
-        print("parse sub code")
+        # print("parse sub code")
         if resp_data["code"] == 20000:
             data = resp_data["data"]
             for key in keys:
