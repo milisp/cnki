@@ -1,7 +1,7 @@
 import scrapy
 from scrapy_playwright.page import PageMethod
 
-from cnki.items import DetailItem, XztgItem
+from cnki.items import CnkiItem
 from cnki.utils import jump_to_start_page, load_progress, update_progress
 
 
@@ -11,6 +11,7 @@ class KoSpider(scrapy.Spider):
     headers = None
 
     def start_requests(self):
+        print("start")
         user_agent = self.settings.get("USER_AGENT")
         self.headers = {"user-agent": user_agent}
         for q in self.settings.get("SF").split(","):
@@ -35,41 +36,42 @@ class KoSpider(scrapy.Spider):
         page = response.meta["playwright_page"]
         q = response.meta["q"]
         total_page = response.css("#lblPageCount::text").get()
+        total = int(total_page)
+        print("total page", total_page)
 
         start_page = load_progress().get(q, 1)
-        # 跳到上次页面或者第一页
-        await jump_to_start_page(page, start_page)
-        total = int(total_page)
+        end_page = self.settings.get("END_PAGE")
+        end_page = int(end_page)
+        if end_page < start_page and end_page == 0:
+            # 跳到上次页面或者第一页
+            if total != start_page:
+                await jump_to_start_page(page, start_page)
+        else:
+            start_page, total = 1, end_page
         for page_num in range(start_page, total + 1):
             # 更新最后页数
             update_progress(q, page_num)
             self.logger.info(f"page {page_num}")
-            # retry
-            for _ in range(3):
-                try:
-                    results = await page.query_selector_all("dl.result")
-                    for i, result in enumerate(results):
-                        self.logger.info(f"results item {i}")
-                        if await result.query_selector('b:has-text("Journal")'):
-                            a = await result.query_selector("h1 a")
-                            link = await a.get_attribute("href")
-                            yield scrapy.Request(
-                                url=response.urljoin(link),
-                                callback=self.parse_detail,
-                            )
-                    break
-                except Exception as e:
-                    print(f"error {e}")
-                    self.logger.error(e)
-
-            next_button = await page.query_selector("a.next")
-            if next_button:
-                self.logger.info("click next page")
+            results = await page.query_selector_all("dl.result")
+            for i, result in enumerate(results):
+                self.logger.info(f"results item {i}")
+                if await result.query_selector('b:has-text("Journal")'):
+                    a = await result.query_selector("h1 a")
+                    link = await a.get_attribute("href")
+                    yield scrapy.Request(
+                        url=response.urljoin(link),
+                        callback=self.parse_detail,
+                    )
+            next_button = await page.wait_for_selector("a.next", timeout=10000)
+            if page_num != total:
+                print(f"to click next page {page_num+1}/{total}")
+                self.logger.info(f"click next page {page_num+1} / {total}")
                 await next_button.click()
 
     # 解析详情页内容
     def parse_detail(self, response):
-        item = DetailItem()
+        print("detail", response.url)
+        item = CnkiItem()
         english_name = response.css("h3.titbox::text").get().strip()
         chinese_name = response.css("h3.titbox+p::text").get()
         item_dict = self.settings.get("ITEM_DICT")
@@ -77,44 +79,53 @@ class KoSpider(scrapy.Spider):
             label = p.css("label::text").get()
             span = p.css("span::text").get()
             if label and span:
-                if "复合影响因子" in label:
-                    item["impactFactors"] = span.strip()
-                elif "综合影响因子" in label:
-                    item["comprehensiveImpactFactors"] = span.strip()
-                else:
-                    try:
-                        item[item_dict[label]] = span.strip()
-                    except Exception as e:
-                        print("label", label, e)
-        item["english_name"] = english_name
-        item["chinese_name"] = chinese_name
-        item["database"] = "|".join(response.css("p.database::text").getall())
-        item["journalType2"] = "|".join(
+                try:
+                    item[item_dict[label]] = span.strip()
+                except Exception:
+                    pass
+        item["englishName"] = english_name
+        item["chineseName"] = chinese_name
+        item["database"] = ";".join(
+            [text.strip() for text in response.css("p.database::text").getall()]
+        )
+        item["journalType2"] = ";".join(
             response.css(".journalType2>span::text").getall()
         )
         baseId = response.url.split("/")[5]
+        item["baseId"] = baseId
         url = f"https://xztg.cnki.net/csjs-sj/JournalBaseInfo/getInfo?baseId={baseId}"
         yield item
         yield scrapy.Request(
-            url, callback=self.parse_tg, meta={"baseId": baseId}, headers=self.headers
+            url,
+            callback=self.parse_tg,
+            meta={"item": item, "baseId": baseId},
         )
 
     def parse_tg(self, response):
         # 投稿
-        item = XztgItem()
+        item = response.meta["item"]
+        baseId = response.meta["baseId"]
+        print(baseId, "tg")
         resp_data = response.json()
         data = resp_data["data"]
-        item["hasFee"] = data["hasFee"]
-        item["reviewCycle"] = data["reviewCycle"]
-        item["timeLag"] = data["timeLag"]
-        baseId = response.meta["baseId"]
+        keys = [
+            "englishName",
+            "chineseName",
+            "hasFee",
+            "reviewCycle",
+            "timeLag",
+            "comprehensiveImpactFactors",
+            "impactFactors",
+        ]
+        for key in keys:
+            item[key] = data[key]
         url = f"https://xztg.cnki.net/csjs-sj/JournalBaseInfo/getSubmissionInfo?baseId={baseId}"
         # print("parse tg ok")
         yield scrapy.Request(
             url,
             callback=self.parse_sub_mission_info,
-            meta={"baseId": baseId, "item": item},
-            headers=self.headers,
+            meta={"item": item},
+            # headers=self.headers,
         )
 
     def parse_sub_mission_info(self, response):

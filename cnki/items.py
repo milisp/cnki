@@ -7,18 +7,14 @@ import scrapy
 
 
 class CnkiItem(scrapy.Item):
-    pass
-
-
-class DetailItem(scrapy.Item):
     # 中英文
-    english_name = scrapy.Field()
-    chinese_name = scrapy.Field()
+    englishName = scrapy.Field()
+    chineseName = scrapy.Field()
 
     # 收录
-    journalType2 = scrapy.Field()
+    journalType2 = scrapy.Field()  # no
     # 数据库
-    database = scrapy.Field()
+    database = scrapy.Field()  # no
 
     # 复合影响因子
     impactFactors = scrapy.Field()
@@ -28,7 +24,7 @@ class DetailItem(scrapy.Item):
     # "主办单位": "
     hostUnit = scrapy.Field()
     # "出版周期": "
-    publicationPlace = scrapy.Field()
+    journalType = scrapy.Field()
     issn = scrapy.Field()
     cn = scrapy.Field()
     # "出版地": "
@@ -46,15 +42,12 @@ class DetailItem(scrapy.Item):
     # "出版文献量": "
     publicCount = scrapy.Field()
     # "总下载次数": "
-    downloadAmount = scrapy.Field()
+    downloadsAmount = scrapy.Field()
     # "总被引次数": "
-    quoteAmount = scrapy.Field()
+    totalCites = scrapy.Field()
 
-
-class XztgItem(scrapy.Item):
     baseId = scrapy.Field()
     reviewCycle = scrapy.Field()
-    publicationCycle = scrapy.Field()
     hostUnit = scrapy.Field()
     editorInChief = scrapy.Field()
     deputyEditor = scrapy.Field()
