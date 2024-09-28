@@ -16,8 +16,8 @@ def save_or_add_df(df, filename):
     if Path(filename).exists():
         old_df = pd.read_excel(filename)
         new_df = pd.concat([old_df, df])
+        new_df = new_df.rename(columns=new_columns)
         df = new_df.drop_duplicates(subset="issn")
-        df = df.rename(columns=new_columns)
         df.to_excel(filename, index=False)
     else:
         df = df.rename(columns=new_columns)

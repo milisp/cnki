@@ -105,7 +105,7 @@ class KoSpider(scrapy.Spider):
         # 投稿
         item = response.meta["item"]
         baseId = response.meta["baseId"]
-        print(baseId, "tg")
+        # print(baseId, "tg")
         resp_data = response.json()
         data = resp_data["data"]
         keys = [
@@ -119,6 +119,8 @@ class KoSpider(scrapy.Spider):
         ]
         for key in keys:
             item[key] = data[key]
+            if key == "reviewCycle":
+                item[key] = int(data[key])
         url = f"https://xztg.cnki.net/csjs-sj/JournalBaseInfo/getSubmissionInfo?baseId={baseId}"
         # print("parse tg ok")
         yield scrapy.Request(
